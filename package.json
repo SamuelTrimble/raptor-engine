@@ -1,0 +1,19 @@
+{
+	"name": "stl-raptor-engine",
+	"version": "0.1.0",
+	"description": "",
+	"private": true,
+	"sideEffects": false,
+	"scripts": {
+		"dev": "webpack --mode development",
+		"build": "webpack --mode production"
+	},
+	"author": "Samuel Trimble @ Silver Talon Labs",
+	"license": "MIT",
+	"devDependencies": {
+		"clean-webpack-plugin": "^1.0.1",
+		"copy-webpack-plugin": "^4.6.0",
+		"webpack": "^4.29.0",
+		"webpack-cli": "^3.2.1"
+	}
+}
