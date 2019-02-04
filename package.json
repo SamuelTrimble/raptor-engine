@@ -1,5 +1,5 @@
 {
-	"name": "stl-raptor-engine",
+	"name": "@stl/raptor-engine",
 	"version": "0.1.0",
 	"description": "",
 	"private": true,
@@ -8,7 +8,7 @@
 		"dev": "webpack --mode development",
 		"build": "webpack --mode production"
 	},
-	"author": "Samuel Trimble @ Silver Talon Labs",
+	"author": "Silver Talon Labs",
 	"license": "MIT",
 	"devDependencies": {
 		"clean-webpack-plugin": "^1.0.1",

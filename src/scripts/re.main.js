@@ -13,6 +13,10 @@ const DEBUGLEVEL = {
 
 class RaptorEngine {
 	constructor(canvasElement = null, options = {}) {
+		this.MINZOOM = 1;
+		this.MAXZOOM = 5;
+		this.ZOOMSCALEINCREMENT = 2;
+
 		this._isRunning = false;
 
 		//Default options
@@ -215,6 +219,14 @@ class RaptorEngine {
 
 		return { x: xPos, y: yPos };
 	}
+	_TileAt(x, y) {
+		if (y < 0) return null;
+		if (y >= this._map.tiles.length) return null;
+		if (x < 0) return null;
+		if (x >= this._map.tiles[y].length) return null;
+
+		return this._map.tiles[y][x];
+	}
 	
 	_RenderFrame() {
 		this._context.fillStyle = this._options.mapBackgroundColor;
@@ -227,19 +239,14 @@ class RaptorEngine {
 			pixelFocus.x += this._map.tileSize;
 			pixelFocus.y += this._map.tileHalfSize;
 
-			let scale = 1;
-			switch (this._options.zoom) {
-				case 1: scale = 4; break;
-				case 2: scale = 2; break;
-				case 3: scale = 1; break;
-				case 4: scale = .5; break;
-				case 5: scale = .25; break;
-				default: scale = 1; break;
+			let scale = .25;
+			for (let z = this._options.zoom; z > this.MINZOOM; z--) {
+				scale *= this.ZOOMSCALEINCREMENT;
 			}
-			let sourceX = (pixelFocus.x - ((this._canvasSize.w * scale) / 2));
-			let sourceY = (pixelFocus.y - ((this._canvasSize.h * scale) / 2));
-			let sourceW = (this._canvasSize.w * scale);
-			let sourceH = (this._canvasSize.h * scale);
+			let sourceX = (pixelFocus.x - ((this._canvasSize.w / scale) / 2));
+			let sourceY = (pixelFocus.y - ((this._canvasSize.h / scale) / 2));
+			let sourceW = (this._canvasSize.w / scale);
+			let sourceH = (this._canvasSize.h / scale);
 
 			this._context.drawImage(this._fullCanvas, sourceX, sourceY, sourceW, sourceH, 0, 0, this._canvasSize.w, this._canvasSize.h);
 		}
@@ -259,13 +266,6 @@ class RaptorEngine {
 		}
 	}
 
-	get position() {
-		return this._options.tileFocus;
-	}
-	get activeTile() {
-		return this.TileAt(this._options.tileFocus.x, this._options.tileFocus.y);
-	}
-
 	get options() {
 		return this._options;
 	}
@@ -282,6 +282,40 @@ class RaptorEngine {
 		if (needToRebuild) {
 			this._BuildMapLayout();
 		}
+	}
+
+	get position() {
+		return this._options.tileFocus;
+	}
+	Move(x, y) {
+		let newTile = this._TileAt(this._options.tileFocus.x + x, this._options.tileFocus.y + y);
+		if (newTile === null) return this.position;
+		if (newTile.occupied) return this.position;
+
+		let prevTile = this._TileAt(this._options.tileFocus.x, this._options.tileFocus.y);
+		prevTile.focused = false;
+
+		newTile.focused = true;
+		this._options.tileFocus.x = newTile.x;
+		this._options.tileFocus.y = newTile.y;
+
+		return this.position;
+	}
+
+	get zoom() {
+		return this._options.zoom;
+	}
+	ZoomIn() {
+		if (this._options.zoom < this.MAXZOOM) {
+			this._options.zoom++;
+		}
+		return this.zoom;
+	}
+	ZoomOut() {
+		if (this._options.zoom > this.MINZOOM) {
+			this._options.zoom--;
+		}
+		return this.zoom;
 	}
 
 	Start() {

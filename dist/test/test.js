@@ -1,6 +1,7 @@
 let ISO = {};
 let run = function() {
 	ISO.engine = new STL.RaptorEngine(document.getElementById("retest"), {
+		debugging: true,
 		debuggingLevel: STL.DEBUGLEVEL.INFO,
 		zoom: 3,
 		visibility: 3,
