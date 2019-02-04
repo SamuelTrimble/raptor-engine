@@ -52,11 +52,11 @@ class RaptorEngine {
 		};
 		
 		if (!canvasElement) {
-			this.Log(DEBUGLEVEL.ERROR, "No 'canvas' specified!");
+			this._Log(DEBUGLEVEL.ERROR, "No 'canvas' specified!");
 			throw new Error("RaptorEngine must be initialized with a valid 'canvas' element!");
 		}
 		if (this._options.mapDataFile === "") {
-			this.Log(DEBUGLEVEL.WARNING, "No 'mapDataFile' specified in the initialization options!");
+			this._Log(DEBUGLEVEL.WARNING, "No 'mapDataFile' specified in the initialization options!");
 		}
 		this._canvas = canvasElement;
 		this._context = this._canvas.getContext('2d');
@@ -77,12 +77,12 @@ class RaptorEngine {
 			easingFunc: this._easing.EaseInOutQuad
 		});
 		
-		this.Log(DEBUGLEVEL.INFO, "Engine Initialized");
+		this._Log(DEBUGLEVEL.INFO, "Engine Initialized");
 
-		this.BuildMapLayout();
+		this._BuildMapLayout();
 	}
 
-	Log(type, output) {
+	_Log(type, output) {
 		if ((this._options.debugging) && (this._options.debuggingLevel <= type)) {
 			switch (type) {
 				case DEBUGLEVEL.INFO:
@@ -98,7 +98,7 @@ class RaptorEngine {
 		}
 	}
 
-	async GetMapData() {
+	async _GetMapData() {
 		try {
 			let response = await fetch(this._options.mapDataFile, {
 				method: 'GET',
@@ -111,19 +111,19 @@ class RaptorEngine {
 			this._map.data = result;
 			return true;
 		} catch (err) {
-			this.Log(DEBUGLEVEL.ERROR, "Retrieving map data failed!");
-			this.Log(DEBUGLEVEL.ERROR, err);
+			this._Log(DEBUGLEVEL.ERROR, "Retrieving map data failed!");
+			this._Log(DEBUGLEVEL.ERROR, err);
 			return false;
 		}
 	}
 
-	async BuildMapLayout() {
-		this.Log(DEBUGLEVEL.INFO, "Building map layout...");
+	async _BuildMapLayout() {
+		this._Log(DEBUGLEVEL.INFO, "Building map layout...");
 
 		this._map.isBuilding = true;
 
 		//Try to load the map data
-		if (!await this.GetMapData()) {
+		if (!await this._GetMapData()) {
 			this._map.isBuilding = false;
 			return;
 		}
@@ -151,7 +151,7 @@ class RaptorEngine {
 			this._map.tiles.push([]);
 			for (let x = 0; x < this._map.tilesW; x++) {
 				if (this._map.data.tileMap[y][x] === 1) {
-					let tilePx = this.GridToPixels(x, y);
+					let tilePx = this._GridToPixels(x, y);
 
 					this._map.tiles[y].push(new RE_Tile({
 						position: {
@@ -206,62 +206,24 @@ class RaptorEngine {
 
 		this._map.isBuilding = false;
 
-		this.Log(DEBUGLEVEL.INFO, "Finished building map layout.");
+		this._Log(DEBUGLEVEL.INFO, "Finished building map layout.");
 	}
 
-	SetOptions(newOptions) {
-		let needToRebuild = false;
-		let oldOptions = this._options;
-		this._options = { ...this._options, ...newOptions };
-
-		//Compare changes to see if the map needs to be rebuilt
-		if (this._options.mapDataFile !== oldOptions.mapDataFile) {
-			needToRebuild = true;
-		}
-
-		if (needToRebuild) {
-			this.BuildMapLayout();
-		}
-	}
-
-	get position() {
-		return this._options.tileFocus;
-	}
-	get activeTile() {
-		return this.TileAt(this._options.tileFocus.x, this._options.tileFocus.y);
-	}
-
-	GridToPixels(x, y) {
+	_GridToPixels(x, y) {
 		let xPos = (x * this._map.tileSize) - (y * this._map.tileSize) + this._map.offsetX;
 		let yPos = (x * this._map.tileHalfSize) + (y * this._map.tileHalfSize);
 
 		return { x: xPos, y: yPos };
 	}
-
-	Start() {
-		this._isRunning = true;
-
-		if (this._timer !== null) {
-			this._timer.Start();
-		}
-		requestAnimationFrame(this.RenderFrame.bind(this));
-	}
-	Stop() {
-		this._isRunning = false;
-
-		if (this._timer !== null) {
-			this._timer.Stop();
-		}
-	}
-
-	RenderFrame() {
+	
+	_RenderFrame() {
 		this._context.fillStyle = this._options.mapBackgroundColor;
 		this._context.fillRect(0, 0, this._canvasSize.w, this._canvasSize.h);
 
 		//Draw map to on-screen canvas
 		if (!this._map.isBuilding) {
 			//Center view on currently focused tile
-			let pixelFocus = this.GridToPixels(this._options.tileFocus.x, this._options.tileFocus.y);
+			let pixelFocus = this._GridToPixels(this._options.tileFocus.x, this._options.tileFocus.y);
 			pixelFocus.x += this._map.tileSize;
 			pixelFocus.y += this._map.tileHalfSize;
 
@@ -293,7 +255,48 @@ class RaptorEngine {
 		}
 
 		if (this._isRunning) {
-			requestAnimationFrame(this.RenderFrame.bind(this));
+			requestAnimationFrame(this._RenderFrame.bind(this));
+		}
+	}
+
+	get position() {
+		return this._options.tileFocus;
+	}
+	get activeTile() {
+		return this.TileAt(this._options.tileFocus.x, this._options.tileFocus.y);
+	}
+
+	get options() {
+		return this._options;
+	}
+	set options(newOptions) {
+		let needToRebuild = false;
+		let oldOptions = this._options;
+		this._options = { ...this._options, ...newOptions };
+
+		//Compare changes to see if the map structure needs to be rebuilt
+		if (this._options.mapDataFile !== oldOptions.mapDataFile) {
+			needToRebuild = true;
+		}
+
+		if (needToRebuild) {
+			this._BuildMapLayout();
+		}
+	}
+
+	Start() {
+		this._isRunning = true;
+
+		if (this._timer !== null) {
+			this._timer.Start();
+		}
+		requestAnimationFrame(this._RenderFrame.bind(this));
+	}
+	Stop() {
+		this._isRunning = false;
+
+		if (this._timer !== null) {
+			this._timer.Stop();
 		}
 	}
 }
