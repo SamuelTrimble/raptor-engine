@@ -73,7 +73,9 @@ export default class {
 			if (this._options.easingFunc !== null) {
 				rotation = this._options.easingFunc(this._state.curFrame, 45, 720, 150);
 			} else {
-				rotation = (this._state.curFrame / 150) * 720 + 45;
+				//Default to Linear progression
+				//change * time / duration + start
+				rotation = 720 * this._state.curFrame / 150 + 45;
 			}
 			if (rotation >= 360) {
 				rotation -= 360;

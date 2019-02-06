@@ -7,6 +7,11 @@ export default class {
 		c: change in value
 		d: duration time
 	*/
+
+	Linear(t, s, c, d) {
+		return c * t / d + s;
+	}
+
 	EaseInOutQuad(t, s, c, d) {
 		t /= (d / 2);
 		if (t < 1) return c / 2 * t * t + s;

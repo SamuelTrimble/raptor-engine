@@ -11,6 +11,13 @@ const DEBUGLEVEL = {
 	ERROR: 2
 };
 
+const TRANSITIONTYPES = {
+	NONE: 0,
+	FADE: 1,
+	MOVE: 2,
+	ZOOM: 3
+};
+
 class RaptorEngine {
 	constructor(canvasElement = null, options = {}) {
 		this.MINZOOM = 1;
@@ -53,6 +60,13 @@ class RaptorEngine {
 			pixelsW: 0,
 			pixelsH: 0,
 			tiles: []
+		};
+
+		this._state = {
+			transition: TRANSITIONTYPES.NONE,
+			prevState: null,
+			nextState: null,
+			transitionFrame: 0
 		};
 		
 		if (!canvasElement) {
