@@ -95,7 +95,6 @@ export default class {
 			this._spinContext.closePath();
 			this._spinContext.fill();
 			this._spinContext.stroke();
-
 			
 			let drawX = ((this._canvas.width - 300) / 2);
 			let drawY = ((this._canvas.height - 150) / 2);
