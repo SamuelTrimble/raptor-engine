@@ -56,6 +56,7 @@ class RaptorEngine {
 		};
 
 		this._state = {
+			loading: false,
 			curPosition: {
 				x: 0,
 				y: 0
@@ -63,7 +64,8 @@ class RaptorEngine {
 			focusedTile: null,
 
 			zoom: 3,
-			visibility: 3,
+			opacity: 0,
+			sightRange: 3,
 
 			transitionQueue: []
 		};
@@ -97,6 +99,24 @@ class RaptorEngine {
 		this._Log(DEBUGLEVEL.INFO, "Engine Initialized");
 
 		this._BuildMapLayout();
+	}
+
+	get options() {
+		return this._options;
+	}
+	set options(newOptions) {
+		let needToRebuild = false;
+		let oldOptions = this._options;
+		this._options = { ...this._options, ...newOptions };
+
+		//Compare changes to see if the map structure needs to be rebuilt
+		if (this._options.mapDataFile !== oldOptions.mapDataFile) {
+			needToRebuild = true;
+		}
+
+		if (needToRebuild) {
+			this._BuildMapLayout();
+		}
 	}
 
 	_Log(type, output) {
@@ -137,6 +157,14 @@ class RaptorEngine {
 	async _BuildMapLayout() {
 		this._Log(DEBUGLEVEL.INFO, "Building map layout...");
 
+		this._state.loading = true;
+
+		if (this._state.opacity === 1) {
+			//Fade out current map before rebuilding
+			this._QueueTransition(TRANSITIONTYPES.FADE, 1, 0, 0, 60, this._easing.Linear, this._BuildMapLayout.bind(this));
+			return;
+		}
+
 		this._map.isBuilding = true;
 
 		//Try to load the map data
@@ -149,7 +177,7 @@ class RaptorEngine {
 		this._state.curPosition.x = this._map.data.start.x;
 		this._state.curPosition.y = this._map.data.start.y;
 		this._state.zoom = this._map.data.start.zoom;
-		this._state.visibility = this._map.data.start.visibility;
+		this._state.sightRange = this._map.data.start.sightRange;
 
 		//Update cached map sizing vars
 		this._map.tileSize = this._map.data.tileSize;
@@ -164,6 +192,12 @@ class RaptorEngine {
 
 		//Clear any queued transitions from previous map data
 		this._state.transitionQueue.length = 0;
+
+		//Fade in when done building
+		this._state.opacity = 0;
+		this._QueueTransition(TRANSITIONTYPES.FADE, 0, 1, 60, 60, this._easing.Linear, () => {
+			this._state.loading = false;
+		});
 
 		//Clear any current tiles and rebuild them
 		//(Clear each row array of columns then clear the array of rows)
@@ -263,11 +297,12 @@ class RaptorEngine {
 		}
 		return false;
 	}
-	_QueueTransition(type, startValue, endValue, duration, easingFunc, callbackFunc) {
+	_QueueTransition(type, startValue, endValue, delay, duration, easingFunc, callbackFunc) {
 		let newT = {
 			type: type,
 			start: startValue,
 			end: endValue,
+			delay: delay,
 			duration: duration,
 			time: 0,
 			easingFunc: easingFunc,
@@ -289,60 +324,67 @@ class RaptorEngine {
 			for (let z = this._state.zoom; z > this.MINZOOM; z--) {
 				scale *= this.ZOOMSCALEINCREMENT;
 			}
-			let opacity = 1;
+			let opacity = this._state.opacity;
 
 			if (this._state.transitionQueue.length > 0) {
 				let curTransition = this._state.transitionQueue[0];
-				curTransition.time++;
 
-				switch (curTransition.type) {
-					case TRANSITIONTYPES.FADE:
-						if (curTransition.time < curTransition.duration) {
-							//Not finished yet. Get value based on where we are in the transition.
-							opacity = curTransition.easingFunc(curTransition.time, curTransition.start, (curTransition.end - curTransition.start), curTransition.duration);
-						} else {
-							//Finished. Use ending value.
-							opacity = curTransition.endValue;
-						}
-						break;
-					case TRANSITIONTYPES.MOVE:
-						let newPixelFocus = this._GridToPixels(curTransition.end.x, curTransition.end.y);
-						if (curTransition.time < curTransition.duration) {
-							//Not finished yet. Get value based on where we are in the transition.
-							pixelFocus.x = curTransition.easingFunc(curTransition.time, pixelFocus.x, (newPixelFocus.x - pixelFocus.x), curTransition.duration);
-							pixelFocus.y = curTransition.easingFunc(curTransition.time, pixelFocus.y, (newPixelFocus.y - pixelFocus.y), curTransition.duration);
-						} else {
-							//Finished. Use ending value and update current state.
-							pixelFocus = newPixelFocus;
+				if (curTransition.delay > 0) {
+					curTransition.delay--;
+				} else {
+					curTransition.time++;
 
-							this._state.focusedTile.focused = false;
-							this._state.focusedTile = curTransition.end;
-							this._state.curPosition.x = curTransition.end.x;
-							this._state.curPosition.y = curTransition.end.y;
-						}
-						break;
-					case TRANSITIONTYPES.ZOOM:
-						let newZoomScale = .25;
-						for (let z = curTransition.end; z > this.MINZOOM; z--) {
-							newZoomScale *= this.ZOOMSCALEINCREMENT;
-						}
-						if (curTransition.time < curTransition.duration) {
-							//Not finished yet. Get value based on where we are in the transition.
-							scale = curTransition.easingFunc(curTransition.time, scale, (newZoomScale - scale), curTransition.duration);
-						} else {
-							//Finished. Use ending value.
-							scale = newZoomScale;
+					switch (curTransition.type) {
+						case TRANSITIONTYPES.FADE:
+							if (curTransition.time < curTransition.duration) {
+								//Not finished yet. Get value based on where we are in the transition.
+								opacity = curTransition.easingFunc(curTransition.time, curTransition.start, (curTransition.end - curTransition.start), curTransition.duration);
+							} else {
+								//Finished. Use ending value.
+								opacity = curTransition.end;
 
-							this._state.zoom = curTransition.end;
-						}
-						break;
-				}
+								this._state.opacity = curTransition.end;
+							}
+							break;
+						case TRANSITIONTYPES.MOVE:
+							let newPixelFocus = this._GridToPixels(curTransition.end.x, curTransition.end.y);
+							if (curTransition.time < curTransition.duration) {
+								//Not finished yet. Get value based on where we are in the transition.
+								pixelFocus.x = curTransition.easingFunc(curTransition.time, pixelFocus.x, (newPixelFocus.x - pixelFocus.x), curTransition.duration);
+								pixelFocus.y = curTransition.easingFunc(curTransition.time, pixelFocus.y, (newPixelFocus.y - pixelFocus.y), curTransition.duration);
+							} else {
+								//Finished. Use ending value and update current state.
+								pixelFocus = newPixelFocus;
 
-				if (curTransition.time === curTransition.duration) {
-					if (curTransition.callbackFunc !== null) {
-						curTransition.callbackFunc();
+								this._state.focusedTile.focused = false;
+								this._state.focusedTile = curTransition.end;
+								this._state.curPosition.x = curTransition.end.x;
+								this._state.curPosition.y = curTransition.end.y;
+							}
+							break;
+						case TRANSITIONTYPES.ZOOM:
+							let newZoomScale = .25;
+							for (let z = curTransition.end; z > this.MINZOOM; z--) {
+								newZoomScale *= this.ZOOMSCALEINCREMENT;
+							}
+							if (curTransition.time < curTransition.duration) {
+								//Not finished yet. Get value based on where we are in the transition.
+								scale = curTransition.easingFunc(curTransition.time, scale, (newZoomScale - scale), curTransition.duration);
+							} else {
+								//Finished. Use ending value.
+								scale = newZoomScale;
+
+								this._state.zoom = curTransition.end;
+							}
+							break;
 					}
-					this._state.transitionQueue.shift();
+
+					if (curTransition.time === curTransition.duration) {
+						if (curTransition.callbackFunc !== null) {
+							curTransition.callbackFunc();
+						}
+						this._state.transitionQueue.shift();
+					}
 				}
 			}
 
@@ -361,7 +403,7 @@ class RaptorEngine {
 		}
 
 		//Draw loading spinner above map
-		this._loadingSpinner.show = this._map.isBuilding;
+		this._loadingSpinner.show = (this._map.isBuilding || this._state.loading);
 		this._loadingSpinner.Render();
 
 		//Draw debugging info above everything else
@@ -375,24 +417,6 @@ class RaptorEngine {
 		}
 	}
 
-	get options() {
-		return this._options;
-	}
-	set options(newOptions) {
-		let needToRebuild = false;
-		let oldOptions = this._options;
-		this._options = { ...this._options, ...newOptions };
-
-		//Compare changes to see if the map structure needs to be rebuilt
-		if (this._options.mapDataFile !== oldOptions.mapDataFile) {
-			needToRebuild = true;
-		}
-
-		if (needToRebuild) {
-			this._BuildMapLayout();
-		}
-	}
-
 	get position() {
 		return this._state.curPosition;
 	}
@@ -403,7 +427,7 @@ class RaptorEngine {
 		if (newTile.occupied) return false;
 
 		if (!this._TransitionExistsInQueue(TRANSITIONTYPES.MOVE)) {
-			this._QueueTransition(TRANSITIONTYPES.MOVE, prevTile, newTile, 15, this._easing.EaseInOutQuad, null);
+			this._QueueTransition(TRANSITIONTYPES.MOVE, prevTile, newTile, 0, 15, this._easing.EaseInOutQuad, null);
 		}
 
 		return true;
@@ -428,7 +452,7 @@ class RaptorEngine {
 		let newZoom = this._state.zoom + z;
 		if (!this._TransitionExistsInQueue(TRANSITIONTYPES.ZOOM)) {
 			if ((newZoom <= this.MAXZOOM) && (newZoom >= this.MINZOOM)) {
-				this._QueueTransition(TRANSITIONTYPES.ZOOM, this._state.zoom, newZoom, 15, this._easing.Linear, null);
+				this._QueueTransition(TRANSITIONTYPES.ZOOM, this._state.zoom, newZoom, 0, 15, this._easing.Linear, null);
 				return true;
 			}
 		}

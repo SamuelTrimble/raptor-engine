@@ -3,7 +3,7 @@
 		"x": 0,
 		"y": 0,
 		"zoom": 3,
-		"visibility": 3
+		"sightRange": 3
 	},
 	"tileSize": 250,
 	"tileMap": [
