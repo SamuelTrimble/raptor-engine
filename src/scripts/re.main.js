@@ -52,7 +52,8 @@ class RaptorEngine {
 			offsetX: 0,
 			pixelsW: 0,
 			pixelsH: 0,
-			tiles: []
+			tiles: [],
+			textures: []
 		};
 
 		this._state = {
