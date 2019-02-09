@@ -15,9 +15,7 @@ export default class {
 				focused: false,
 				occupied: false
 			},
-			texture: {
-
-			}
+			texture: null
 		};
 		this._options = { ...this._options, ...options };
 	}
@@ -44,5 +42,9 @@ export default class {
 	}
 	set occupied(value) {
 		this._options.state.occupied = value;
+	}
+	
+	get texture() {
+		return this._options.texture;
 	}
 }

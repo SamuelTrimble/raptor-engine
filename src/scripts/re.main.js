@@ -24,8 +24,6 @@ class RaptorEngine {
 		this.MAXZOOM = 5;
 		this.ZOOMSCALEINCREMENT = 2;
 
-		this._isRunning = false;
-
 		//Default options
 		this._options = {
 			debugging: (process.env.NODE_ENV !== "production"),
@@ -42,6 +40,7 @@ class RaptorEngine {
 		//Cached vars for map building
 		this._map = {
 			data: null,
+			textureData: null,
 			isBuilding: false,
 			tileSize: 0,
 			tileQuarterSize: 0,
@@ -52,12 +51,13 @@ class RaptorEngine {
 			offsetX: 0,
 			pixelsW: 0,
 			pixelsH: 0,
-			tiles: [],
-			textures: []
+			tiles: []
 		};
 
 		this._state = {
 			loading: false,
+			running: false,
+
 			curPosition: {
 				x: 0,
 				y: 0
@@ -136,22 +136,65 @@ class RaptorEngine {
 		}
 	}
 
-	async _GetMapData() {
+	_LoadImage(path) {
+		return new Promise((resolve, reject) => {
+			let img = new Image();
+			img.onload = (() => {
+				resolve(img);
+			});
+			img.onerror = (() => {
+				this._Log(DEBUGLEVEL.ERROR, "Retrieving image at: '" + path + "' failed!");
+				resolve(null);
+			});
+			img.src = path;
+		});
+	}
+	async _GetMapData(path) {
 		try {
-			let response = await fetch(this._options.mapDataFile, {
+			let response = await fetch(path, {
 				method: 'GET',
 				headers: {
 					'Content-type': 'application/json'
 				}
 			});
 			let result = await response.json();
-
-			this._map.data = result;
-			return true;
+			return result;
 		} catch (err) {
 			this._Log(DEBUGLEVEL.ERROR, "Retrieving map data failed!");
 			this._Log(DEBUGLEVEL.ERROR, err);
-			return false;
+			return null;
+		}
+	}
+	async _GetTextures(textures) {
+		try {
+			let promiseArr = [];
+			for (let t = 0; t < textures.length; t++) {
+				promiseArr.push(this._LoadImage(textures[t].path));
+			}
+			let textureImages = await Promise.all(promiseArr);
+
+			let textureData = {};
+			textureData.sourceImages = textureImages;
+			textureData.textures = {};
+			for (let t = 0; t < textures.length; t++) {
+				for (let ti = 0; ti < textures[t].tiles.length; ti++) {
+					let tile = textures[t].tiles[ti];
+					textureData.textures[tile.name] = {
+						img: t,
+						x: tile.x,
+						y: tile.y,
+						w: textures[t].size.w,
+						h: textures[t].size.h,
+						z: textures[t].size.z,
+						blocking: tile.blocking
+					};
+				}
+			}
+			return textureData;
+		} catch (err) {
+			this._Log(DEBUGLEVEL.ERROR, "Retrieving map textures failed!");
+			this._Log(DEBUGLEVEL.ERROR, err);
+			return null;
 		}
 	}
 
@@ -169,7 +212,15 @@ class RaptorEngine {
 		this._map.isBuilding = true;
 
 		//Try to load the map data
-		if (!await this._GetMapData()) {
+		this._map.data = await this._GetMapData(this._options.mapDataFile);
+		if (this._map.data === null) {
+			this._map.isBuilding = false;
+			return;
+		}
+
+		//Try to load map textures
+		this._map.textureData = await this._GetTextures(this._map.data.textures);
+		if (this._map.textureData === null) {
 			this._map.isBuilding = false;
 			return;
 		}
@@ -213,6 +264,7 @@ class RaptorEngine {
 			for (let x = 0; x < this._map.tilesW; x++) {
 				if (this._map.data.tileMap[y][x] === 1) {
 					let tilePx = this._GridToPixels(x, y);
+					let tileTexture = ((this._map.data.textureMap[y][x] !== "") ? this._map.textureData.textures[this._map.data.textureMap[y][x]] : null);
 					let newTile = new RE_Tile({
 						position: {
 							x, y
@@ -224,8 +276,10 @@ class RaptorEngine {
 							h: this._map.tileSize
 						},
 						state: {
-							focused: ((x === this._state.curPosition.x) && (y === this._state.curPosition.y))
-						}
+							focused: ((x === this._state.curPosition.x) && (y === this._state.curPosition.y)),
+							occupied: ((tileTexture !== null) ? tileTexture.blocking : false)
+						},
+						texture: tileTexture
 					});
 
 					if (newTile.focused) {
@@ -257,15 +311,33 @@ class RaptorEngine {
 				if (tile !== null) {
 					let px = tile.bounds.x;
 					let py = tile.bounds.y;
+					let pw = tile.bounds.w;
+					let ph = tile.bounds.h;
+					let texture = tile.texture;
 
-					this._fullContext.beginPath();
-					this._fullContext.moveTo(px, py + this._map.tileHalfSize);
-					this._fullContext.lineTo(px + this._map.tileSize, py);
-					this._fullContext.lineTo(px + this._map.tileDoubleSize, py + this._map.tileHalfSize);
-					this._fullContext.lineTo(px + this._map.tileSize, py + this._map.tileSize);
-					this._fullContext.closePath();
-					this._fullContext.fill();
-					this._fullContext.stroke();
+					if (texture !== null) {
+						let sourceImg = this._map.textureData.sourceImages[texture.img];
+						let sourceX = texture.x;
+						let sourceY = texture.y;
+						let sourceW = texture.w;
+						let sourceH = texture.h;
+						let scaleW = (pw / texture.w);
+						let destX = px;
+						let destW = pw;
+						let destH = (scaleW * texture.h);
+						let destY = (py + ph + texture.z - destH);
+
+						this._fullContext.drawImage(sourceImg, sourceX, sourceY, sourceW, sourceH, destX, destY, destW, destH);
+					} else {
+						this._fullContext.beginPath();
+						this._fullContext.moveTo(px, py + this._map.tileHalfSize);
+						this._fullContext.lineTo(px + this._map.tileSize, py);
+						this._fullContext.lineTo(px + this._map.tileDoubleSize, py + this._map.tileHalfSize);
+						this._fullContext.lineTo(px + this._map.tileSize, py + this._map.tileSize);
+						this._fullContext.closePath();
+						this._fullContext.fill();
+						this._fullContext.stroke();
+					}
 				}
 			}
 		}
@@ -413,7 +485,7 @@ class RaptorEngine {
 			this._timer.Render();
 		}
 
-		if (this._isRunning) {
+		if (this._state.running) {
 			requestAnimationFrame(this._RenderFrame.bind(this));
 		}
 	}
@@ -467,7 +539,7 @@ class RaptorEngine {
 	}
 
 	Start() {
-		this._isRunning = true;
+		this._state.running = true;
 
 		if (this._timer !== null) {
 			this._timer.Start();
@@ -475,7 +547,7 @@ class RaptorEngine {
 		requestAnimationFrame(this._RenderFrame.bind(this));
 	}
 	Stop() {
-		this._isRunning = false;
+		this._state.running = false;
 
 		if (this._timer !== null) {
 			this._timer.Stop();

@@ -5,7 +5,7 @@
 		"zoom": 3,
 		"sightRange": 3
 	},
-	"tileSize": 250,
+	"tileSize": 128,
 	"tileMap": [
 		[1, 1, 1, 1, 1, 1, 0, 0, 0],
 		[0, 1, 1, 1, 1, 1, 0, 0, 0],
@@ -19,54 +19,87 @@
 		[0, 0, 0, 0, 0, 0, 1, 1, 1],
 		[0, 0, 0, 0, 0, 0, 0, 1, 0]
 	],
-	"textures": {
-		"floors": {
-			"path": "textures/floor-tiles.png",
+	"textures": [
+		{
+			"path": "textures/floor_tiles.png",
 			"size": {
 				"w": 128,
-				"h": 256
+				"h": 256,
+				"z": 10
 			},
-			"tiles": {
-				"f1": {
+			"tiles": [
+				{
+					"name": "f1",
+					"blocking": false,
 					"x": 0,
 					"y": 0
 				},
-				"f2": {
+				{
+					"name": "f2",
+					"blocking": false,
 					"x": 128,
 					"y": 0
 				},
-				"f3": {
+				{
+					"name": "f3",
+					"blocking": false,
 					"x": 256,
 					"y": 0
 				},
-				"f4": {
+				{
+					"name": "f4",
+					"blocking": false,
 					"x": 384,
 					"y": 0
 				},
-				"f5": {
+				{
+					"name": "f5",
+					"blocking": false,
 					"x": 0,
 					"y": 256
 				},
-				"f6": {
+				{
+					"name": "f6",
+					"blocking": false,
 					"x": 128,
 					"y": 256
 				},
-				"f7": {
+				{
+					"name": "f7",
+					"blocking": false,
 					"x": 256,
 					"y": 256
 				},
-				"f8": {
+				{
+					"name": "f8",
+					"blocking": false,
 					"x": 384,
 					"y": 256
 				}
-			}
+			]
+		},
+		{
+			"path": "textures/pillar.png",
+			"size": {
+				"w": 128,
+				"h": 256,
+				"z": 10
+			},
+			"tiles": [
+				{
+					"name": "pillar",
+					"blocking": true,
+					"x": 0,
+					"y": 0
+				}
+			]
 		}
-	},
+	],
 	"textureMap": [
 		["f1", "f2", "f3", "f4", "f5", "f6", "", "", ""],
 		["", "f7", "f8", "f1", "f2", "f3", "", "", ""],
 		["", "f4", "f5", "f6", "f7", "f8", "", "", ""],
-		["", "f1", "f2", "f3", "f4", "f5", "", "", ""],
+		["", "f1", "f2", "pillar", "f4", "f5", "", "", ""],
 		["", "f6", "f7", "f8", "f1", "f2", "", "", ""],
 		["", "f3", "f4", "f5", "f6", "f7", "f8", "f1", ""],
 		["", "", "", "", "", "", "", "f2", ""],
