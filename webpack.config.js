@@ -6,16 +6,16 @@ module.exports = {
 	entry: {
 		engine: './src/index.js'
 	},
+	output: {
+		filename: '[name].bundle.js',
+		path: path.resolve(__dirname, 'dist')
+	},
 	plugins: [
-		new CleanWebpackPlugin(['dist']),
+		new CleanWebpackPlugin(),
 		new CopyWebpackPlugin([
 			{
 				from: './src/static'
 			}
 		])
-	],
-	output: {
-		filename: '[name].bundle.js',
-		path: path.resolve(__dirname, 'dist')
-	}
+	]
 };
